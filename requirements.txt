@@ -2,3 +2,10 @@ syft-core
 syft-event
 fastsyftbox
 jinja2
+faiss-cpu
+sentence-transformers
+nltk
+jupyter
+tqdm
+numpy
+polars

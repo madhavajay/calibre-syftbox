@@ -1,11 +1,15 @@
 import json
 import os
+import hashlib
 from pathlib import Path
 from typing import List
 
 from pydantic import BaseModel
 
 calibre_convert = "/Applications/calibre.app/Contents/MacOS/ebook-convert"
+
+def book_hash(file_path: str) -> str:
+    return hashlib.sha256(file_path.encode("utf-8")).hexdigest()
 
 
 class Book(BaseModel):
@@ -15,6 +19,7 @@ class Book(BaseModel):
     cover_path: str | None = None
     text_path: str | None = None
     is_converted: bool = False
+    book_hash: str | None = None
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -24,6 +29,8 @@ class Book(BaseModel):
         )
         self.extract_author_and_title()
         self.is_converted = os.path.exists(self.text_path)
+        self.book_hash = book_hash(self.text_path)
+
 
     def extract_author_and_title(self):
         # Split the file path into parts
@@ -45,6 +52,32 @@ class Book(BaseModel):
             os.system(command)
             print(f"Conversion complete for {self.file_path}")
             self.is_converted = True
+
+    @staticmethod
+    def get_by_hash(book_hash: str, library_path: str) -> "Book":
+        """
+        Retrieve a Book object by its hash from the Calibre library.
+
+        Args:
+            book_hash (str): The hash of the book to retrieve.
+            library_path (str): The path to the Calibre library.
+
+        Returns:
+            Book: The Book object corresponding to the given hash, or None if not found.
+        """
+        # Scan the Calibre library to get a list of books
+        books = scan_calibre_library(library_path)
+        print("len books", books)
+
+        # Iterate over the books to find the one with the matching hash
+        for book in books:
+            print("book.book_hash", book.book_hash)
+            print("book_hash", book_hash)
+            if book_hash == book.book_hash:
+                return book
+
+        # Return None if no matching book is found
+        return None
 
 
 def scan_calibre_library(library_path: str) -> List[Book]:
@@ -78,6 +111,7 @@ def scan_calibre_library(library_path: str) -> List[Book]:
 
     books = [Book(file_path=path) for path, _ in book_dict.values()]
     return books
+
 
 
 class Settings(BaseModel):

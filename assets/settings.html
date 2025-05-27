@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calibre RAG - Settings</title>
+    <style>
+        @import "css/styles.css";
+
+        /* Additional CSS for Settings Page */
+        .settings-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .settings-header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .settings-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .settings-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .settings-form {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .settings-form::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .form-section {
+            margin-bottom: 35px;
+        }
+
+        .form-section:last-of-type {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-description {
+            color: #666;
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .path-input-group {
+            position: relative;
+        }
+
+        .browse-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .browse-btn:hover {
+            transform: translateY(-50%) scale(1.05);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .form-help {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        .default-path {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            color: #495057;
+            margin-top: 8px;
+        }
+
+        .save-button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 30px auto 0;
+        }
+
+        .save-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(76, 175, 80, 0.4);
+        }
+
+        .save-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 4px solid #28a745;
+            display: none;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 4px solid #dc3545;
+            display: none;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Status indicators */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .status-valid {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-invalid {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-unknown {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .settings-container {
+                padding: 20px 15px;
+            }
+
+            .settings-form {
+                padding: 25px;
+            }
+
+            .settings-header h1 {
+                font-size: 2rem;
+            }
+
+            .browse-btn {
+                position: static;
+                transform: none;
+                margin-top: 10px;
+                width: 100%;
+            }
+
+            .path-input-group .form-input {
+                padding-right: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                📚 Calibre RAG
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/library" class="nav-link">Library</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/settings" class="nav-link active">Settings</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="settings-container">
+        <!-- Settings Header -->
+        <div class="settings-header">
+            <h1>⚙️ Settings</h1>
+            <p>Configure your library and conversion settings</p>
+        </div>
+
+        <!-- Settings Form -->
+        <form class="settings-form" id="settingsForm" onsubmit="saveSettings(event)">
+            <!-- Success/Error Messages -->
+            <div class="success-message" id="successMessage">
+                <strong>✅ Settings saved successfully!</strong>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <strong>❌ Error:</strong> <span id="errorText"></span>
+            </div>
+
+            <!-- Calibre Configuration Section -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    📚 Calibre Configuration
+                </h3>
+                <p class="section-description">
+                    Configure the paths to your Calibre installation and library. These settings are required for book
+                    conversion and management features.
+                </p>
+
+                <!-- Calibre Convert Binary Path -->
+                <div class="form-group">
+                    <label for="calibreConvertPath" class="form-label">
+                        Calibre Convert Binary Path
+                    </label>
+                    <input type="text" id="calibreConvertPath" name="calibre_convert_path" class="form-input"
+                        placeholder="Enter path to ebook-convert binary" value="{{ settings.calibre_convert_path }}">
+                    <div class="form-help">
+                        Path to the Calibre ebook-convert binary used for format conversion
+                    </div>
+                    <div class="default-path">
+                        Default: /Applications/calibre.app/Contents/MacOS/ebook-convert
+                    </div>
+                </div>
+
+                <!-- Calibre Library Path -->
+                <div class="form-group">
+                    <label for="calibreLibraryPath" class="form-label">
+                        Calibre Library Folder Path
+                    </label>
+                    <input type="text" id="calibreLibraryPath" name="calibre_library_path" class="form-input"
+                        placeholder="Enter path to Calibre library folder" value="{{ settings.calibre_library_path }}">
+                    <div class="form-help">
+                        Path to your Calibre library folder containing your book collection
+                    </div>
+                    <div class="default-path">
+                        Default: ~/Calibre Library or /Users/[username]/Calibre Library
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <button type="submit" class="save-button" id="saveButton">
+                <span>💾</span>
+                Save Settings
+            </button>
+        </form>
+    </div>
+
+    <script>
+
+        async function saveSettings(event) {
+            event.preventDefault();
+
+            const saveButton = document.getElementById('saveButton');
+            const successMessage = document.getElementById('successMessage');
+            const errorMessage = document.getElementById('errorMessage');
+
+            // Hide previous messages
+            successMessage.style.display = 'none';
+            errorMessage.style.display = 'none';
+
+            // Show loading state
+            saveButton.disabled = true;
+            saveButton.innerHTML = '<div class="loading-spinner"></div> Saving...';
+
+            try {
+                const formData = new FormData(event.target);
+                const settings = {
+                    calibre_convert_path: formData.get('calibre_convert_path'),
+                    calibre_library_path: formData.get('calibre_library_path')
+                };
+
+                const response = await fetch('/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    successMessage.style.display = 'block';
+                    // Scroll to top to show success message
+                    document.querySelector('.settings-form').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    const error = await response.json();
+                    document.getElementById('errorText').textContent = error.detail || 'Failed to save settings';
+                    errorMessage.style.display = 'block';
+                    document.querySelector('.settings-form').scrollIntoView({ behavior: 'smooth' });
+                }
+            } catch (error) {
+                document.getElementById('errorText').textContent = 'Network error: ' + error.message;
+                errorMessage.style.display = 'block';
+                document.querySelector('.settings-form').scrollIntoView({ behavior: 'smooth' });
+            } finally {
+                // Reset button
+                saveButton.disabled = false;
+                saveButton.innerHTML = '<span>💾</span> Save Settings';
+            }
+        }
+
+        function browsePath(inputId) {
+            // In a real implementation, this would open a file/folder picker
+            // For now, we'll show an alert with instructions
+            const isLibrary = inputId === 'calibreLibraryPath';
+            const message = isLibrary ?
+                'Use Finder to navigate to your Calibre Library folder and copy the full path.\n\nTypical locations:\n• ~/Calibre Library\n• /Users/[username]/Calibre Library' :
+                'Use Finder to navigate to:\n/Applications/calibre.app/Contents/MacOS/\nand copy the full path to "ebook-convert"';
+
+            alert('File Browser:\n\n' + message);
+        }
+
+        async function validatePath(inputId, statusId) {
+            const input = document.getElementById(inputId);
+            const status = document.getElementById(statusId);
+            const path = input.value.trim();
+
+            if (!path) {
+                status.className = 'status-indicator status-unknown';
+                status.innerHTML = '<span>❓</span> Enter a path to validate';
+                return;
+            }
+
+            // Show validating state
+            status.className = 'status-indicator status-unknown';
+            status.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px; border-width: 2px;"></div> Validating...';
+
+            try {
+                const response = await fetch('/validate_path', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ path: path })
+                });
+
+                const result = await response.json();
+
+                if (result.valid) {
+                    status.className = 'status-indicator status-valid';
+                    status.innerHTML = '<span>✅</span> Path is valid';
+                } else {
+                    status.className = 'status-indicator status-invalid';
+                    status.innerHTML = '<span>❌</span> Path not found or invalid';
+                }
+            } catch (error) {
+                status.className = 'status-indicator status-invalid';
+                status.innerHTML = '<span>❌</span> Unable to validate path';
+            }
+        }
+    </script>
+</body>
+
+</html>

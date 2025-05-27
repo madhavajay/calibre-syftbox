@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calibre RAG - Library</title>
+    <style>
+        @import "css/styles.css";
+
+        /* Search and controls styling */
+        .search-controls {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .bulk-controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .bulk-btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bulk-btn-clear {
+            background: #6c757d;
+            color: white;
+        }
+
+        .bulk-btn-clear:hover {
+            background: #5a6268;
+        }
+
+        .bulk-btn-select {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .bulk-btn-select:hover {
+            background: #138496;
+        }
+
+        .bulk-btn-convert {
+            background: #28a745;
+            color: white;
+        }
+
+        .bulk-btn-convert:hover {
+            background: #218838;
+        }
+
+        .bulk-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Compact book card styling */
+        .bookshelf {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .book-card {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+            border: 2px solid transparent;
+        }
+
+        .book-card:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .book-card.selected {
+            border-color: #007bff;
+            background: #f8f9ff;
+        }
+
+        .book-content {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .book-cover {
+            width: 48px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .book-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .book-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0 0 4px 0;
+            line-height: 1.3;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .book-author {
+            font-size: 12px;
+            color: #6c757d;
+            margin: 0 0 4px 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .book-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .status-converted {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .checkbox-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #ddd;
+            border-radius: 3px;
+            background: white;
+            transition: all 0.2s;
+        }
+
+        .book-card.selected .checkbox-indicator {
+            background: #007bff;
+            border-color: #007bff;
+        }
+
+        .book-card.selected .checkbox-indicator::after {
+            content: '✓';
+            color: white;
+            font-size: 12px;
+            position: absolute;
+            top: -1px;
+            left: 2px;
+        }
+
+        .converting-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 8px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .converting-text {
+            font-size: 12px;
+            color: #6c757d;
+            text-align: center;
+        }
+
+        /* Message styling */
+        .message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .message.success {
+            background: #28a745;
+        }
+
+        .message.error {
+            background: #dc3545;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Batch progress styling */
+        .batch-progress {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            min-width: 280px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .batch-progress.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .batch-progress h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+        }
+
+        .batch-progress-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .batch-progress-fill {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .batch-status {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                📚 Calibre RAG
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="/" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/library" class="nav-link active">Library</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/settings" class="nav-link">Settings</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="header">
+            <h1>📚 Calibre Library</h1>
+            <p>Convert your library to Text for LLM / RAG</p>
+        </header>
+
+        <!-- Search and controls -->
+        <div class="search-controls">
+            <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search books by title or author...">
+            <div class="bulk-controls">
+                <button class="bulk-btn bulk-btn-clear" onclick="clearAllSelections()">
+                    ❌ Clear All
+                </button>
+                <button class="bulk-btn bulk-btn-select" onclick="selectAllVisible()">
+                    ✅ Select All
+                </button>
+                <button class="bulk-btn bulk-btn-convert" onclick="convertSelected()" id="convertSelectedBtn">
+                    🚀 Convert Selected
+                </button>
+                <button class="bulk-btn bulk-btn-clear" onclick="deleteSelected()" id="deleteSelectedBtn">
+                    🗑️ Delete .txt
+                </button>
+            </div>
+            <div style="margin-top: 16px;">
+                <label>
+                    <input type="radio" name="filter" value="all" checked onchange="filterBooks()"> All
+                </label>
+                <label style="margin-left: 12px;">
+                    <input type="radio" name="filter" value="converted" onchange="filterBooks()"> ✅ Converted
+                </label>
+                <label style="margin-left: 12px;">
+                    <input type="radio" name="filter" value="not_available" onchange="filterBooks()"> ❌ Not Available
+                </label>
+            </div>
+
+        </div>
+
+        <div class="bookshelf" id="bookshelf">
+            <!-- Books will be dynamically generated here -->
+        </div>
+
+        <div class="no-results" id="noResults" style="display: none;">
+            <h3>No books found</h3>
+            <p>Try adjusting your search terms</p>
+        </div>
+    </div>
+
+    <!-- Batch conversion progress indicator -->
+    <div class="batch-progress" id="batchProgress">
+        <h4>Converting Books</h4>
+        <div class="batch-progress-bar">
+            <div class="batch-progress-fill" id="batchProgressFill"></div>
+        </div>
+        <div class="batch-status" id="batchStatus">Starting conversion...</div>
+    </div>
+
+    <script>
+        // Sample book data - will be replaced with {{ books }}
+        const books = {{ books }};
+        let filteredBooks = [...books];
+        let selectedBooks = new Set();
+
+        console.log(books);
+
+        function renderBooks() {
+            const bookshelf = document.getElementById('bookshelf');
+            const noResults = document.getElementById('noResults');
+
+            if (filteredBooks.length === 0) {
+                bookshelf.style.display = 'none';
+                noResults.style.display = 'block';
+                return;
+            }
+
+            bookshelf.style.display = 'grid';
+            noResults.style.display = 'none';
+            bookshelf.innerHTML = '';
+
+            filteredBooks.forEach((book, index) => {
+                const originalIndex = books.findIndex(b => b.file_path === book.file_path);
+                const isSelected = selectedBooks.has(originalIndex);
+
+                const bookCard = document.createElement('div');
+                bookCard.className = `book-card ${isSelected ? 'selected' : ''}`;
+                bookCard.onclick = () => toggleBookSelection(originalIndex);
+
+                bookCard.innerHTML = `
+                    <div class="checkbox-indicator"></div>
+                    <div class="book-content">
+                        <img src="/get_image?path=${book.cover_path || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=300&h=400&fit=crop'}" 
+                             alt="${book.title || 'Book cover'}" class="book-cover">
+                        
+                        <div class="book-info">
+                            <h3 class="book-title">${book.title || 'Unknown Title'}</h3>
+                            <p class="book-author">by ${book.author || 'Unknown Author'}</p>
+                            <div class="book-status">
+                                <span class="status-badge ${book.is_converted ? 'status-converted' : 'status-pending'}">
+                                    ${book.is_converted ? '✅ Converted' : '❌ Not Available'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="overlay-${originalIndex}"></div>
+                `;
+                bookshelf.appendChild(bookCard);
+            });
+
+            updateConvertButton();
+        }
+
+        function filterBooks() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            const selectedFilter = document.querySelector('input[name="filter"]:checked').value;
+
+            filteredBooks = books.filter(book => {
+                const title = (book.title || '').toLowerCase();
+                const author = (book.author || '').toLowerCase();
+                const matchesSearch = title.includes(searchTerm) || author.includes(searchTerm);
+
+                const matchesFilter =
+                    selectedFilter === 'all' ||
+                    (selectedFilter === 'converted' && book.is_converted) ||
+                    (selectedFilter === 'not_available' && !book.is_converted);
+
+                return matchesSearch && matchesFilter;
+            });
+
+            renderBooks();
+        }
+
+
+        function toggleBookSelection(originalIndex) {
+            if (selectedBooks.has(originalIndex)) {
+                selectedBooks.delete(originalIndex);
+            } else {
+                selectedBooks.add(originalIndex);
+            }
+            renderBooks();
+        }
+
+        function clearAllSelections() {
+            selectedBooks.clear();
+            renderBooks();
+        }
+
+        function selectAllVisible() {
+            filteredBooks.forEach(book => {
+                const originalIndex = books.findIndex(b => b.file_path === book.file_path);
+                selectedBooks.add(originalIndex);
+            });
+            renderBooks();
+        }
+
+        function updateConvertButton() {
+            const convertBtn = document.getElementById('convertSelectedBtn');
+            const selectedCount = selectedBooks.size;
+            const unconvertedSelected = Array.from(selectedBooks).filter(index => !books[index].is_converted).length;
+
+            convertBtn.textContent = `🚀 Convert Selected (${unconvertedSelected})`;
+            convertBtn.disabled = unconvertedSelected === 0;
+        }
+
+        function showConvertingOverlay(index) {
+            const overlay = document.getElementById(`overlay-${index}`);
+            if (overlay) {
+                overlay.className = 'converting-overlay';
+                overlay.innerHTML = `
+                    <div class="spinner"></div>
+                    <div class="converting-text">Converting...</div>
+                `;
+            }
+        }
+
+        function hideConvertingOverlay(index) {
+            const overlay = document.getElementById(`overlay-${index}`);
+            if (overlay) {
+                overlay.className = '';
+                overlay.innerHTML = '';
+            }
+        }
+
+        function showMessage(message, type = 'success') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+
+        async function convertSelected() {
+            const selectedIndexes = Array.from(selectedBooks).filter(index => !books[index].is_converted);
+
+            if (selectedIndexes.length === 0) {
+                showMessage('No unconverted books selected!', 'error');
+                return;
+            }
+
+            const convertBtn = document.getElementById('convertSelectedBtn');
+            convertBtn.disabled = true;
+            convertBtn.textContent = '🔄 Converting...';
+
+            // Show batch progress
+            showBatchProgress();
+            updateBatchProgress(0, selectedIndexes.length);
+
+            let converted = 0;
+            let errors = [];
+
+            for (let i = 0; i < selectedIndexes.length; i++) {
+                const bookIndex = selectedIndexes[i];
+                const book = books[bookIndex];
+
+                updateBatchProgress(i, selectedIndexes.length, book.title || 'Unknown Title');
+                showConvertingOverlay(bookIndex);
+
+                try {
+                    const response = await fetch('/convert_book', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            file_path: book.file_path
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        books[bookIndex].text_path = result.text_path;
+                        books[bookIndex].is_converted = true;
+                        selectedBooks.delete(bookIndex); // Deselect after successful conversion
+                        converted++;
+                        showMessage(`"${book.title}" converted successfully!`);
+                    } else {
+                        errors.push(`${book.title}: ${result.detail}`);
+                    }
+                } catch (error) {
+                    errors.push(`${book.title}: ${error.message}`);
+                }
+
+                hideConvertingOverlay(bookIndex);
+            }
+
+            // Final update
+            updateBatchProgress(selectedIndexes.length, selectedIndexes.length);
+
+            // Re-render books
+            renderBooks();
+
+            // Reset button
+            convertBtn.disabled = false;
+            updateConvertButton();
+
+            // Hide progress after a delay
+            setTimeout(() => {
+                hideBatchProgress();
+            }, 2000);
+
+            // Show final results
+            if (errors.length > 0) {
+                showMessage(`${converted} converted, ${errors.length} errors`, 'error');
+            } else {
+                showMessage(`Successfully converted ${converted} books!`);
+            }
+        }
+
+        async function deleteSelected() {
+            const selectedIndexes = Array.from(selectedBooks).filter(index => books[index].is_converted);
+
+            if (selectedIndexes.length === 0) {
+                showMessage('No converted books selected for deletion!', 'error');
+                return;
+            }
+
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = '🗑️ Deleting...';
+
+            let deleted = 0;
+            let errors = [];
+
+            for (let i = 0; i < selectedIndexes.length; i++) {
+                const bookIndex = selectedIndexes[i];
+                const book = books[bookIndex];
+
+                try {
+                    const response = await fetch('/remove_book', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ file_path: book.file_path })
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        books[bookIndex].text_path = null;
+                        books[bookIndex].is_converted = false;
+                        deleted++;
+                        showMessage(`"${book.title}" .txt deleted.`);
+                    } else {
+                        errors.push(`${book.title}: ${result.detail}`);
+                    }
+                } catch (error) {
+                    errors.push(`${book.title}: ${error.message}`);
+                }
+            }
+
+            renderBooks();
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = '🗑️ Delete .txt';
+
+            if (errors.length > 0) {
+                showMessage(`${deleted} deleted, ${errors.length} errors`, 'error');
+            } else {
+                showMessage(`Deleted ${deleted} book(s).`);
+            }
+        }
+
+
+        function showBatchProgress() {
+            const batchProgress = document.getElementById('batchProgress');
+            batchProgress.classList.add('show');
+        }
+
+        function hideBatchProgress() {
+            const batchProgress = document.getElementById('batchProgress');
+            batchProgress.classList.remove('show');
+        }
+
+        function updateBatchProgress(current, total, currentBookTitle = '') {
+            const progressFill = document.getElementById('batchProgressFill');
+            const statusText = document.getElementById('batchStatus');
+
+            const percentage = (current / total) * 100;
+            progressFill.style.width = `${percentage}%`;
+
+            if (current === total) {
+                statusText.textContent = `Completed! (${current}/${total})`;
+            } else {
+                statusText.textContent = `Converting "${currentBookTitle}" (${current}/${total})`;
+            }
+        }
+
+        // Initialize search functionality
+        document.getElementById('searchBox').addEventListener('input', filterBooks);
+
+        // Initialize the bookshelf
+        renderBooks();
+    </script>
+</body>
+
+</html>

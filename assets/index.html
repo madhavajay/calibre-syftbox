@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calibre RAG</title>
+    <style>
+        @import "css/styles.css";
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                📚 Calibre RAG
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="/" class="nav-link active">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/library" class="nav-link">Library</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/settings" class="nav-link">Settings</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <h1>📊 Dashboard</h1>
+            <p>Chat with your Calibre eBooks</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card total">
+                <div class="stat-number" id="totalBooks">24</div>
+                <div class="stat-label">Total Books</div>
+            </div>
+
+            <div class="stat-card converted">
+                <div class="stat-number" id="convertedBooks">18</div>
+                <div class="stat-label">Converted to Text</div>
+                <div class="stat-progress">
+                    <div class="stat-progress-fill" id="convertedProgress" style="width: 75%"></div>
+                </div>
+                <div class="stat-percentage" id="convertedPercentage">75%</div>
+            </div>
+
+            <div class="stat-card indexed">
+                <div class="stat-number" id="indexedBooks">12</div>
+                <div class="stat-label">Indexed for Search</div>
+                <div class="stat-progress">
+                    <div class="stat-progress-fill" id="indexedProgress" style="width: 50%"></div>
+                </div>
+                <div class="stat-percentage" id="indexedPercentage">50%</div>
+            </div>
+        </div>
+
+        <!-- RAG Query Section -->
+        <div class="query-section">
+            <h3>
+                <span>🔍</span>
+                Search Your Library
+            </h3>
+            <div class="query-form">
+                <textarea class="query-textarea" id="queryInput" placeholder="Ask anything about your books... 
+
+Examples:
+• What are the main themes in Dune?
+• Compare the writing styles of Jane Austen and George Orwell
+• What books discuss artificial intelligence?
+• Summarize the key concepts from my philosophy books"></textarea>
+
+                <button class="query-btn" onclick="submitQuery()" id="queryBtn">
+                    <span>✨</span>
+                    Search Books
+                </button>
+            </div>
+
+            <div class="query-results" id="queryResults">
+                <h4>
+                    <span>📖</span>
+                    Search Results
+                </h4>
+                <div class="query-results-content" id="queryResultsContent">
+                    <!-- Results will appear here -->
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Chrome Extension -->
+        <div class="extension-card">
+            <div class="extension-icon">🔧</div>
+            <h3>Chrome Extension</h3>
+            <p>Install our Chrome extension to save web articles and research papers directly to your library for
+                instant RAG search capabilities.</p>
+            <button class="install-btn" onclick="installExtension()">
+                <span>🚀</span>
+                Install Chrome Extension
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Sample data - replace with actual API calls
+        let libraryStats = {{ library_stats }};
+
+        function updateStats() {
+            // Update the dashboard stats
+            document.getElementById('totalBooks').textContent = libraryStats.books_total;
+            document.getElementById('convertedBooks').textContent = libraryStats.text_total;
+            document.getElementById('indexedBooks').textContent = libraryStats.indexed_total;
+
+            // Calculate percentages
+            const convertedPercentage = Math.round((libraryStats.text_total / libraryStats.books_total) * 100);
+            const indexedPercentage = Math.round((libraryStats.indexed_total / libraryStats.books_total) * 100);
+
+            // Update progress bars
+            document.getElementById('convertedProgress').style.width = convertedPercentage + '%';
+            document.getElementById('indexedProgress').style.width = indexedPercentage + '%';
+
+            // Update percentage text
+            document.getElementById('convertedPercentage').textContent = convertedPercentage + '%';
+            document.getElementById('indexedPercentage').textContent = indexedPercentage + '%';
+        }
+
+        function installExtension() {
+            // This would typically open Chrome Web Store or trigger extension installation
+            alert('Opening Chrome Web Store...\n\nIn a real implementation, this would:\n1. Check if Chrome is being used\n2. Open the extension page in Chrome Web Store\n3. Guide user through installation');
+
+            // Example of what you might do:
+            // window.open('https://chrome.google.com/webstore/detail/your-extension-id', '_blank');
+        }
+
+        async function submitQuery() {
+            const queryInput = document.getElementById('queryInput');
+            const queryBtn = document.getElementById('queryBtn');
+            const queryResults = document.getElementById('queryResults');
+            const queryResultsContent = document.getElementById('queryResultsContent');
+
+            const query = queryInput.value.trim();
+
+            if (!query) {
+                alert('Please enter a query to search your books.');
+                return;
+            }
+
+            // Disable button and show loading
+            queryBtn.disabled = true;
+            queryBtn.innerHTML = '<div class="loading-spinner"></div> Searching...';
+
+            // Show results section
+            queryResults.classList.add('show');
+            queryResultsContent.innerHTML = '<div class="loading-spinner"></div> Searching through your library...';
+
+            try {
+                // Make API call to your RAG endpoint
+                const response = await fetch('/query_books', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    // Display results
+                    queryResultsContent.innerHTML = `
+                        <div style="margin-bottom: 15px;">
+                            <strong>Query:</strong> "${query}"
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Answer:</strong>
+                        </div>
+                        <div>${result.answer || 'No specific answer found, but here are some relevant excerpts from your books.'}</div>
+                        
+                        ${result.sources && result.sources.length > 0 ? `
+                            <div style="margin-top: 20px;">
+                                <strong>Sources:</strong>
+                                <ul style="margin-top: 10px;">
+                                    ${result.sources.map(source => `
+                                        <li style="margin-bottom: 8px;">
+                                            <strong>${source.book_title}</strong> ${source.author ? `by ${source.author}` : ''}
+                                            ${source.excerpt ? `<br><em>"${source.excerpt.substring(0, 200)}..."</em>` : ''}
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    `;
+                } else {
+                    const error = await response.json();
+                    queryResultsContent.innerHTML = `
+                        <div style="color: #c62828;">
+                            <strong>Error:</strong> ${error.detail || 'Failed to search books. Please try again.'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Query error:', error);
+                queryResultsContent.innerHTML = `
+                    <div style="color: #c62828;">
+                        <strong>Network Error:</strong> Failed to connect to the search service. Please check your connection and try again.
+                    </div>
+                `;
+            } finally {
+                // Re-enable button
+                queryBtn.disabled = false;
+                queryBtn.innerHTML = '<span>✨</span> Search Books';
+            }
+        }
+
+        // Handle Enter key in textarea
+        document.getElementById('queryInput').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                submitQuery();
+            }
+        });
+
+        // Load stats on page load
+        async function loadDashboardData() {
+            try {
+                // Replace with actual API call
+                // const response = await fetch('/api/library_stats');
+                // const stats = await response.json();
+                // libraryStats = stats;
+
+                updateStats();
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
+        }
+
+        // Initialize dashboard
+        loadDashboardData();
+    </script>
+</body>
+
+</html>

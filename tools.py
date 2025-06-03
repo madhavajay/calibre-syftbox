@@ -96,7 +96,7 @@ def scan_calibre_library(library_path: str) -> List[Book]:
 
     book_dict = {}
     for file in library.rglob("*"):
-        if file.suffix in {".epub", ".mobi", ".pdf"}:
+        if file.suffix in {".epub", ".mobi", ".azw3", ".pdf"}:
             book_name = file.stem
             current_format = file.suffix
             if book_name not in book_dict:
@@ -105,7 +105,7 @@ def scan_calibre_library(library_path: str) -> List[Book]:
                 _, existing_format = book_dict[book_name]
                 # Prioritize formats: .epub > .mobi > .pdf
                 if (
-                    existing_format == ".pdf" and current_format in {".epub", ".mobi"}
+                    existing_format == ".pdf" and current_format in {".epub", ".mobi", ".azw3"}
                 ) or (existing_format == ".mobi" and current_format == ".epub"):
                     book_dict[book_name] = (str(file), current_format)
 

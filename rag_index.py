@@ -1,29 +1,27 @@
-import os
-from tqdm import tqdm
 import asyncio
-import hashlib
-import torch
-import polars as pl
+import os
 from datetime import datetime, timedelta
+from multiprocessing import Process
 from pathlib import Path
 from typing import List
 
 import faiss
-from multiprocessing import Process
 import nltk
+import numpy as np
+import polars as pl
+import torch
+from filelock import FileLock
 from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer
-from filelock import FileLock
+from tqdm import tqdm
 
-from tools import Book, Settings, scan_calibre_library, book_hash
+from tools import Book, Settings, book_hash, scan_calibre_library
 
 # Ensure punkt is downloaded
 try:
     nltk.data.find("tokenizers/punkt")
 except LookupError:
     nltk.download("punkt", quiet=True)
-
-
 
 
 class RAGIndexer:
@@ -45,26 +43,20 @@ class RAGIndexer:
             print("Index is empty.")
             return []
 
-        # Encode the query
         query_embedding = self.model.encode([query], convert_to_numpy=True)
-
-        # Perform search
         distances, indices = index.search(query_embedding, top_k)
 
         results = []
         for idx, dist in zip(indices[0], distances[0]):
             if idx < len(metadata):
                 row = metadata.row(idx)
-                results.append({
-                    "score": float(dist),
-                    "chunk": row[1],
-                    "book_hash": row[2]
-                })
+                results.append(
+                    {"score": float(dist), "chunk": row[1], "book_hash": row[2]}
+                )
             else:
                 print(f"[WARNING] Index {idx} out of metadata range.")
 
         return results
-
 
     @staticmethod
     def get_data_path(app_data_dir: Path) -> Path:
@@ -104,13 +96,16 @@ class RAGIndexer:
         if meta_path.exists():
             metadata = pl.read_parquet(meta_path)
         else:
-            # Define schema explicitly to avoid SchemaError on vstack
             metadata = pl.DataFrame(
-                schema={"id": pl.Int64, "chunk": pl.String, "book_hash": pl.String}
+                schema={
+                    "id": pl.Int64,
+                    "chunk": pl.String,
+                    "book_hash": pl.String,
+                    "embedding": pl.List(pl.Float64),
+                }
             )
 
         return index, metadata
-
 
     def save_index_to_disk(self, index, metadata: pl.DataFrame):
         index_path = self.data_path / self.INDEX_FILENAME
@@ -120,6 +115,40 @@ class RAGIndexer:
             print("lock achieved")
             faiss.write_index(index, str(index_path))
             metadata.write_parquet(meta_path)
+
+    def remove_book_from_index(self, book: Book):
+        _, metadata = self.load_index_from_disk()
+        b_hash = book_hash(book.text_path)
+
+        if b_hash not in metadata["book_hash"].to_list():
+            print(f"[INFO] Book '{book.title}' is not indexed. Nothing to remove.")
+            return
+
+        remaining_metadata = metadata.filter(pl.col("book_hash") != b_hash)
+
+        if not remaining_metadata.is_empty():
+            embeddings = np.vstack(remaining_metadata["embedding"].to_list())
+            new_index = faiss.IndexFlatL2(embeddings.shape[1])
+            new_index.add(embeddings)
+        else:
+            print(f"[INFO] No remaining books in index after removing '{book.title}'")
+            new_index = faiss.IndexFlatL2(384)
+
+        updated_metadata = remaining_metadata.with_columns(
+            pl.Series("id", list(range(len(remaining_metadata))))
+        )
+
+        self.save_index_to_disk(new_index, updated_metadata)
+
+        base_path = Path(book.text_path)
+        base_path.with_suffix(base_path.suffix + ".indexed").unlink(missing_ok=True)
+        base_path.with_suffix(base_path.suffix + ".indexing").unlink(missing_ok=True)
+
+        base_path = Path(book.text_path)
+        base_path.with_suffix(".indexing").unlink(missing_ok=True)
+        base_path.with_suffix(".indexed").unlink(missing_ok=True)
+
+        print(f"[INFO] Removed book '{book.title}' from index.")
 
     def add_book_to_index(self, book: Book):
         base_path = Path(book.text_path)
@@ -159,29 +188,54 @@ class RAGIndexer:
                 message = f"Chunked into {len(chunks)} chunks\n"
                 log.write(message)
                 print(message)
-                message = f"Encoding chunks...\n"
+                message = "Encoding chunks...\n"
                 log.write(message)
                 print(message)
 
                 embeddings = self.model.encode(
-                    chunks, convert_to_numpy=True, batch_size=128, show_progress_bar=True
+                    chunks,
+                    convert_to_numpy=True,
+                    batch_size=128,
+                    show_progress_bar=True,
                 )
 
                 base_id = len(metadata)
                 new_rows = [
-                    {"id": base_id + i, "chunk": chunk, "book_hash": b_hash}
-                    for i, chunk in enumerate(chunks)
+                    {
+                        "id": base_id + i,
+                        "chunk": chunk,
+                        "book_hash": b_hash,
+                        "embedding": embedding.tolist(),
+                    }
+                    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
                 ]
 
-                metadata = metadata.vstack(pl.DataFrame(new_rows))
+                new_metadata = pl.DataFrame(new_rows)
+                new_metadata = new_metadata.with_columns([
+                    pl.col("id").cast(pl.Int64),
+                    pl.col("chunk").cast(pl.Utf8),
+                    pl.col("book_hash").cast(pl.Utf8),
+                    pl.col("embedding").cast(pl.List(pl.Float64))
+                ])
+                
+                # Ensure the metadata DataFrame has the same schema as new_metadata
+                metadata = metadata.with_columns([
+                    pl.col("id").cast(pl.Int64),
+                    pl.col("chunk").cast(pl.Utf8),
+                    pl.col("book_hash").cast(pl.Utf8),
+                    pl.col("embedding").cast(pl.List(pl.Float64))
+                ])
+                
+                metadata = metadata.vstack(new_metadata)
 
                 message = "Adding to FAISS index...\n"
                 log.write(message)
                 print(message)
 
-                # Add in small chunks to monitor progress
                 batch_size = 512
-                for i in tqdm(range(0, len(embeddings), batch_size), desc="Adding to FAISS index"):
+                for i in tqdm(
+                    range(0, len(embeddings), batch_size), desc="Adding to FAISS index"
+                ):
                     end = i + batch_size
                     index.add(embeddings[i:end])
 
@@ -225,14 +279,12 @@ def is_book_indexed(book: Book) -> bool:
     if indexing_path.exists():
         mtime = datetime.fromtimestamp(indexing_path.stat().st_mtime)
         if datetime.now() - mtime < timedelta(minutes=10):
-            # print(f"[DEBUG] Skipping {book.title}: indexing in progress")
             return True
         else:
             print(f"[DEBUG] Removing stale .indexing for {book.title}")
             indexing_path.unlink(missing_ok=True)
 
     if indexed_path.exists():
-        # print(f"[DEBUG] Skipping {book.title}: already indexed (marker file found)")
         return True
 
     return False
@@ -241,6 +293,7 @@ def is_book_indexed(book: Book) -> bool:
 def create_background_indexer_loop(app_data_dir, max_concurrent=1):
     async def background_indexer_loop():
         await asyncio.sleep(5)
+        print("background indexer loop started")
         settings = Settings.load(app_data_dir=app_data_dir)
         print(f"[{datetime.now()}] Background RAG indexer started...")
 

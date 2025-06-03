@@ -1,35 +1,55 @@
-import asyncio
 import json
 import os
 import sys
 import traceback
-from datetime import datetime
 from pathlib import Path
-from syft_core import Client as SyftboxClient
-from syft_core import SyftClientConfig
 
 import jinja2
-from fastapi import FastAPI
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastsyftbox.syftbox import Syftbox
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+import asyncio
+from fastsyftbox import FastSyftBox
 from pydantic import BaseModel
 
 from rag_index import RAGIndexer, create_background_indexer_loop
-
 from tools import Book, Settings, scan_calibre_library
+from syft_core import Client as SyftboxClient
+from syft_core import SyftClientConfig
 
 app_name = Path(__file__).resolve().parent.name
-app = FastAPI(title=app_name)
+
 config = SyftClientConfig.load()
 client = SyftboxClient(config)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start background task
+    task = asyncio.create_task(create_background_indexer_loop(app_data_dir=app_data_dir)())
+    print("Background task started.")
+    yield
+    # Shutdown logic
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        print("Background task cancelled.")
+
+app = FastSyftBox(
+    app_name=app_name,
+    syftbox_config=config,
+    lifespan=lifespan,
+    syftbox_endpoint_tags=[
+        "syftbox"
+    ],  # endpoints with this tag are also available via Syft RPC
+    include_syft_openapi=True,  # Create OpenAPI endpoints for syft-rpc routes
+)
 
 current_dir = Path(__file__).parent
 app_data_dir = Path(client.config.data_dir) / "private" / "app_data" / app_name
 app_data_dir.mkdir(parents=True, exist_ok=True)
-
-syftbox = Syftbox(app=app, name=app_name, background_tasks=[create_background_indexer_loop(app_data_dir=app_data_dir)])
 
 
 app.mount(
@@ -223,7 +243,10 @@ async def query_books(request: Request):
         if not results:
             return JSONResponse(
                 status_code=200,
-                content={"answer": "No specific answer found, but here are some relevant excerpts from your books.", "sources": []},
+                content={
+                    "answer": "No specific answer found, but here are some relevant excerpts from your books.",
+                    "sources": [],
+                },
             )
 
         # Format the results
@@ -233,18 +256,25 @@ async def query_books(request: Request):
             book_hash = result["book_hash"]
             print(book_hash)
             if book_hash not in book_cache:
-                book_cache[book_hash] = Book.get_by_hash(book_hash, settings.calibre_library_path)
+                book_cache[book_hash] = Book.get_by_hash(
+                    book_hash, settings.calibre_library_path
+                )
             book = book_cache[book_hash]
             print("got book", book)
-            formatted_results.append({
-                "book_title": book.title,
-                "author": book.author,
-                "excerpt": result["chunk"]
-            })
+            formatted_results.append(
+                {
+                    "book_title": book.title,
+                    "author": book.author,
+                    "excerpt": result["chunk"],
+                }
+            )
 
         return JSONResponse(
             status_code=200,
-            content={"answer": "Here are some relevant excerpts from your books.", "sources": formatted_results},
+            content={
+                "answer": "Here are some relevant excerpts from your books.",
+                "sources": formatted_results,
+            },
         )
 
     except Exception as e:
@@ -333,14 +363,13 @@ async def remove_book(request: Request):
                 content={"detail": "Text file not found."},
             )
     except Exception as e:
+        import traceback
+
+        print("error", traceback.format_exc())
         return JSONResponse(
             status_code=500,
             content={"detail": f"An error occurred: {str(e)}"},
         )
-
-
-
-
 
 
 class MessageModel(BaseModel):
@@ -350,14 +379,14 @@ class MessageModel(BaseModel):
 
 # Build your DTN RPC endpoints available on
 # syft://{datasite}/app_data/{app_name}/rpc/endpoint
-@syftbox.on_request("/hello")
-def hello_handler(request: MessageModel):
+@app.post("/hello", tags=["syftbox"])
+def hello_handler(request: MessageModel) -> JSONResponse:
     response = MessageModel(message=f"Hi {request.name}", name="Bob")
     return response.model_dump_json()
 
 
 # Debug your RPC endpoints in the browser
-syftbox.enable_debug_tool(
+app.enable_debug_tool(
     endpoint="/hello",
     example_request=str(MessageModel(message="Hello!", name="Alice").model_dump_json()),
     publish=True,

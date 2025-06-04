@@ -1,3 +1,6 @@
+import time
+import json
+import uuid
 import json
 import os
 import sys
@@ -8,16 +11,19 @@ import jinja2
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import asyncio
 from fastsyftbox import FastSyftBox
 from pydantic import BaseModel
+from completion import ChatCompletionResponse, ChatCompletionChoice, ChatMessage
 
 from rag_index import RAGIndexer, create_background_indexer_loop
 from tools import Book, Settings, scan_calibre_library
 from syft_core import Client as SyftboxClient
 from syft_core import SyftClientConfig
+from completion import ChatCompletionResponse, ModelList, chat_completions, list_models, ChatCompletionRequest, ChatMessage
 
 app_name = Path(__file__).resolve().parent.name
 
@@ -224,13 +230,9 @@ async def get_image(request: Request):
             content={"detail": "Invalid image path or not a .jpg file"},
         )
 
-
-@app.post("/query_books", response_class=JSONResponse)
-async def query_books(request: Request):
+async def query_books(query: str):
     settings = Settings.load(app_data_dir=app_data_dir)
     try:
-        data = await request.json()
-        query = data.get("query")
 
         if not query:
             return JSONResponse(
@@ -283,6 +285,18 @@ async def query_books(request: Request):
             content={"detail": f"An error occurred: {str(e)}"},
         )
 
+
+@app.post("/query_books", response_class=JSONResponse)
+async def query_books_endpoint(request: Request):
+    try:
+        data = await request.json()
+        query = data.get("query")
+        return await query_books(query)
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"An error occurred: {str(e)}"},
+        )
 
 @app.post("/convert_book", response_class=JSONResponse)
 async def convert_book(request: Request):
@@ -372,6 +386,49 @@ async def remove_book(request: Request):
         )
 
 
+
+@app.post(
+    "/v1/chat/completions", response_model=ChatCompletionResponse, tags=["syftbox"]
+)
+async def chat_completions_endpoint(request: Request, body: ChatCompletionRequest):
+    try:
+        last_user_msg = next(
+            (m.content for m in reversed(body.messages) if m.role == "user"), "Hi"
+        )
+        query = last_user_msg
+        print("last_user_msg", last_user_msg)
+        response = await query_books(query)
+        print("results", response)
+        json_results = response.body.decode()
+
+        print("json_results", json_results)
+        result = ChatCompletionResponse(
+            id=f"chatcmpl-{uuid.uuid4().hex}",
+            object="chat.completion",
+            created=int(time.time()),
+            model=body.model,
+            choices=[
+                ChatCompletionChoice(
+                    index=0,
+                    message=ChatMessage(role="assistant", content=json_results),
+                    finish_reason="stop",
+                )
+            ],
+            usage={"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20},
+        )
+        print("result", result, type(result))
+        return result
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"An error occurred: {str(e)}"},
+        )
+
+@app.get("/v1/models", response_model=ModelList)
+async def list_models_endpoint(request: Request):
+    return await list_models()
+
+
 class MessageModel(BaseModel):
     message: str
     name: str | None = None
@@ -385,10 +442,19 @@ def hello_handler(request: MessageModel) -> JSONResponse:
     return response.model_dump_json()
 
 
-# Debug your RPC endpoints in the browser
+example_request = str(
+    ChatCompletionRequest(
+        model="openai/chatgpt-4o-latest",
+        messages=[ChatMessage(role="user", content="Hello!")],
+        temperature=1.0,
+        max_tokens=256,
+    ).model_dump_json()
+)
+
+# Debug your Syft RPC endpoints in the browser
 app.enable_debug_tool(
-    endpoint="/hello",
-    example_request=str(MessageModel(message="Hello!", name="Alice").model_dump_json()),
+    endpoint="/v1/chat/completions",
+    example_request=str(example_request),
     publish=True,
 )
 
@@ -410,3 +476,5 @@ async def custom_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "Internal Server Error"},
     )
+
+

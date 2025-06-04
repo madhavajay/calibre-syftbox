@@ -1,0 +1,93 @@
+{
+    "manifest_version": 3,
+    "name": "SyftBox MCP",
+    "version": "1.0",
+    "description": "Chat with SyftBox",
+    "icons": {
+        "128": "icon.png"
+    },
+    "permissions": [
+        "contextMenus",
+        "scripting",
+        "activeTab",
+        "storage"
+    ],
+    "host_permissions": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://grok.com/*",
+        "https://perplexity.ai/*",
+        "https://www.perplexity.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://chat.deepseek.com/*",
+        "https://gemini.google.com/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://chat.openai.com/*",
+                "https://chatgpt.com/*",
+                "https://claude.ai/*",
+                "https://grok.com/*",
+                "https://perplexity.ai/*",
+                "https://www.perplexity.ai/*",
+                "https://copilot.microsoft.com/*",
+                "https://chat.deepseek.com/*",
+                "https://gemini.google.com/*"
+            ],
+            "js": [
+                "syftbox-sdk.js",
+                "sites/chatgpt.js",
+                "sites/claude.js",
+                "sites/copilot.js",
+                "sites/deepseek.js",
+                "sites/gemini.js",
+                "sites/grok.js",
+                "sites/perplexity.js",
+                "content.js"
+            ],
+            "css": [
+                "styles-chatgpt.css",
+                "styles-claude.css",
+                "styles-grok.css",
+                "styles-perplexity.css",
+                "styles-copilot.css",
+                "styles-deepseek.css",
+                "styles-gemini.css"
+            ],
+            "type": "module"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "styles-chatgpt.css",
+                "styles-claude.css",
+                "styles-grok.css",
+                "styles-perplexity.css",
+                "styles-copilot.css",
+                "styles-deepseek.css",
+                "styles-gemini.css"
+            ],
+            "matches": [
+                "https://chat.openai.com/*",
+                "https://chatgpt.com/*",
+                "https://claude.ai/*",
+                "https://grok.com/*",
+                "https://perplexity.ai/*",
+                "https://www.perplexity.ai/*",
+                "https://copilot.microsoft.com/*",
+                "https://chat.deepseek.com/*",
+                "https://gemini.google.com/*"
+            ]
+        }
+    ],
+    "action": {
+        "default_icon": "icon.png",
+        "default_title": "SyftBox MCP"
+    }
+}
